@@ -106,4 +106,20 @@ Add quality gates without slowing down the system
 Clearly see which agent passed or failed in the UI
 Extend the workflow as new agents or checks are needed
 
+## Test With 
+
+### To Pass Evals
+
+```
+Hi, my name is Sarah Jade. You can reach me at sarah.j@example.com or 555-123-4567.I have a billing issue: I was charged $299.99 on my invoice #INV-123456 on 12/01/2025 and I need a refund ASAP.Please call me today if possible. I’ve attached a screenshot of the invoice.Thanks!
+```
+
+### To Fail Evals
+
+```
+Hello,I think there might be an issue with my account or billing.I was charged recently and I’m not sure why.My name is Sarah Jade.You can email me at sarah.j@example.com.Please help when you get a chance.
+```
+
+
+
 
