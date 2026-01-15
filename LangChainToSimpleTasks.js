@@ -9,7 +9,6 @@ import { createSimpleExtractionAgent } from './langchainAgent.js';
 
 // import the eval langchain agents
 import { createGroundingEvalAgent } from './groundingEvalAgent.js'; 
-import { createSchemaEvalAgent } from './schemaEvalAgent.js';
 import { createRoutingEvalAgent } from './routingEvalAgent.js';
 import { createQualityEvalAgent } from "./qualityEvalAgent.js";
 
@@ -18,7 +17,6 @@ import 'dotenv/config';
 // Initialize all agents once (reuse across tasks)
 const agent = createSimpleExtractionAgent();
 const groundingEvalAgent = createGroundingEvalAgent();
-const schemaEvalAgent = createSchemaEvalAgent();
 const routingEvalAgent = createRoutingEvalAgent();
 const qualityEvalAgent = createQualityEvalAgent();
 
@@ -92,62 +90,6 @@ const groundingEvalAgentWorker = {
             .filter((msg) => msg.tool_calls && msg.tool_calls.length > 0)
             .flatMap((msg) => msg.tool_calls.map((tc) => tc.name))
         : ['evaluate_grounding'];
-
-      return {
-        outputData: {
-          response,
-          toolsUsed,
-          messageCount: result?.messages?.length ?? 0,
-        },
-        status: 'COMPLETED',
-      };
-    } catch (error) {
-      return {
-        outputData: { error: error.message, response: null },
-        status: 'FAILED',
-        reasonForIncompletion: `Agent execution failed: ${error.message}`,
-      };
-    }
-  },
-};
-
-// Wrapper 2
-const schemaEvalAgentWorker = {
-  taskDefName: 'schema_eval_agent',
-  execute: async (task) => {
-    try {
-      const input = task.inputData ?? {};
-
-      // Prefer ticketJson; fall back to query if you want to keep it flexible
-      const ticketJson = input.ticketJson ?? input.query ?? '';
-
-      if (!ticketJson) {
-        return {
-          outputData: { error: 'Missing ticketJson (or query)', response: null },
-          status: 'FAILED_WITH_TERMINAL_ERROR',
-          reasonForIncompletion: 'Missing required input: ticketJson',
-        };
-      }
-
-const result = await schemaEvalAgent.invoke({
-  messages: [
-    {
-      role: 'user',
-      content: JSON.stringify({ ticketJson }),
-    },
-  ],
-});
-
-      const response =
-        typeof result === 'string'
-          ? result
-          : (result?.messages?.[result.messages.length - 1]?.content ?? JSON.stringify(result));
-
-      const toolsUsed = result?.messages
-        ? result.messages
-            .filter((msg) => msg.tool_calls && msg.tool_calls.length > 0)
-            .flatMap((msg) => msg.tool_calls.map((tc) => tc.name))
-        : ['evaluate_schema'];
 
       return {
         outputData: {
@@ -275,7 +217,7 @@ async function startWorker() {
 
   console.log('Connected to Conductor ✅');
 
-  const taskManager = new TaskManager(client, [extractAgentWorker, groundingEvalAgentWorker, schemaEvalAgentWorker, routingEvalAgentWorker, qualityEvalAgentWorker], {
+  const taskManager = new TaskManager(client, [extractAgentWorker, groundingEvalAgentWorker, routingEvalAgentWorker, qualityEvalAgentWorker], {
     options: { concurrency: 10, pollInterval: 200 },
   });
 

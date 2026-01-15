@@ -175,59 +175,8 @@ This is an evaluation agent that checks grounding (aka “did we make stuff up?�
 }
 
 ```
-### 3. Schema Evaluation Agent
 
-This is an evaluation agent that checks schema correctness (aka “does this output match what downstream systems expect?”). It validates that the extracted ticket JSON conforms to the required structure, data types, and allowed values. The agent ensures all required fields are present, enums contain valid values, and nested objects and arrays follow the expected shape.
-
-If the extracted ticket does not match the schema, the eval fails and reports exactly which fields are invalid or missing. If the ticket fully conforms to the schema, the eval passes with a perfect score.
-
-This agent focuses purely on structural and format validity — it does not check whether values are grounded in the original message or whether the categorization is semantically correct.
-
-#### Input  
-
-```json
-{
-  "ticketJson": {
-    "customer": { "name": "Jane Doe", "email": null, "phone": null },
-    "issue": { "category": "billing", "urgency": "high", "summary": "Charged for invoice." },
-    "entities": { "dates": ["12/01/2025"], "amounts": ["$49.99"], "reference_ids": ["ABC123"] },
-    "flags": { "requires_callback": false, "mentions_attachment": false },
-    "meta": { "extracted_at": "2026-01-14T22:10:31.150Z" }
-  }
-}
-```
-
-#### Output (valid schema)
-
-```json 
-{
-  "evaluator": "schema",
-  "passed": true,
-  "score": 1,
-  "errors": [],
-  "mismatches": []
-}
-```
-
-#### Output (invalid schema)
-
-```json
-{
-  "evaluator": "schema",
-  "passed": false,
-  "score": 0,
-  "errors": ["Schema mismatch"],
-  "mismatches": [
-    {
-      "path": "issue.urgency",
-      "expected": "one of: low | medium | high",
-      "got": "URGENT"
-    }
-  ]
-}
-```
-
-### 4. Routing Evaluation Agent
+### 3. Routing Evaluation Agent
 This is an evaluation agent that checks routing sanity (aka “will this ticket get sent to the right team with the right priority?”). It takes the original customer message and the extracted ticket JSON, then uses a lightweight set of keyword-based expectations to validate that the category, urgency, and routing flags chosen by the extractor are reasonable.
 
 The agent looks for clear signals in the customer message—such as billing-related terms, technical error keywords, urgency phrases, or requests for callbacks—and compares those signals against what the extractor produced. When the message strongly implies a specific routing decision and the extracted ticket disagrees, the agent flags a mismatch.
@@ -291,7 +240,7 @@ Each violated expectation is recorded as a mismatch. The score decreases slightl
 }
 ```
 
-### 5. Quality Evaluation Agent
+### 4. Quality Evaluation Agent
 
 This evaluation agent checks whether the extracted ticket is useful and reasonable. It looks at the original customer message and the extracted ticket JSON, then judges whether the summary is specific, the category and urgency make sense, and obvious details from the message weren’t missed. This isn’t a strict “truth check” like grounding. It’s more of a “would a support team actually want this ticket?” check.
 
