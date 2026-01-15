@@ -19,10 +19,25 @@ No more going by hand to recreate workflows in the UI
 How someone runs it
 cp .env.example .env
 # fill in values
+
+```bash
 npm i
 npm run register-workflows
-
+```
 
 Optional dry run:
 
+```bash
 npm run plan:register-workflows
+```
+
+run a specific file
+```bash
+npm run register-workflows -- workflows/my-workflow.json
+```
+
+plan mode: 
+
+```bash
+npm run register-workflows -- workflows/my-workflow.json --plan
+```

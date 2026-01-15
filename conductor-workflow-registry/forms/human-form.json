@@ -1,0 +1,16 @@
+{
+  "name": "simple_approval_form_from_code",
+  "version": 1,
+  "description": "A simple form for approvals",
+  "formTemplate": {
+    "name": "Approval Form",
+    "fields": [
+      {
+        "name": "approved",
+        "type": "boolean",
+        "required": true,
+        "label": "Approve Request"
+      }
+    ]
+  }
+}
