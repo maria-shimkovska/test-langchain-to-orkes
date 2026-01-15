@@ -1,0 +1,50 @@
+{
+  "createdBy": "USER:maria.shimkovska@orkes.io",
+  "updatedBy": "USER:maria.shimkovska@orkes.io",
+  "name": "extraction_review_form",
+  "version": 2,
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "type": "object",
+    "required": [
+      "decision"
+    ],
+    "properties": {
+      "context": {
+        "type": "string",
+        "title": "Ticket context",
+        "readOnly": true
+      },
+      "decision": {
+        "type": "string",
+        "title": "Save this ticket to the database?",
+        "enum": [
+          "YES",
+          "NO"
+        ]
+      }
+    }
+  },
+  "templateUI": {
+    "type": "VerticalLayout",
+    "elements": [
+      {
+        "type": "Control",
+        "scope": "#/properties/context",
+        "label": "Ticket context",
+        "options": {
+          "multi": true,
+          "readonly": true
+        }
+      },
+      {
+        "type": "Control",
+        "scope": "#/properties/decision",
+        "label": "Save this ticket to the database?",
+        "options": {
+          "format": "radio"
+        }
+      }
+    ]
+  }
+}
