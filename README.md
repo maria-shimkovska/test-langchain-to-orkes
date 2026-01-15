@@ -8,65 +8,7 @@ That result is then automatically evaluated in parallel by multiple AI agents (c
 
 If everything passes, the workflow proceeds automatically and saves the result. If anything looks off, the workflow intelligently routes the case to a human reviewer, with full context and reasons clearly visible.
 
-```
-          ┌──────────────────────┐
-          │   Incoming Message   │
-          │   (User Query)       │
-          └─────────┬────────────┘
-                    │
-                    ▼
-          ┌──────────────────────┐
-          │   AI Extraction      │
-          │ (Structured Output)  │
-          └─────────┬────────────┘
-                    │
-                    ▼
-        ┌───────────────────────────────┐
-        │   Parallel AI Evaluations     │
-        │                               │
-        │  ┌──────────┐  ┌──────────┐   │
-        │  │ Grounding│  │  Quality │   │
-        │  │   Eval   │  │   Eval   │   │
-        │  └──────────┘  └──────────┘   │
-        │          ┌──────────┐         │
-        │          │ Routing  │         │
-        │          │   Eval   │         │
-        │          └──────────┘         │
-        └──────────────┬────────────────┘
-                       │
-                       ▼
-          ┌──────────────────────┐
-          │ Aggregate Results    │
-          │ + Pass / Fail Gate   │
-          └─────────┬────────────┘
-                    │
-           ┌────────┴────────┐
-           │                 │
-           ▼                 ▼
-┌──────────────────┐   ┌──────────────────────┐
-│ All Checks Pass  │   │ One or More Failures │
-│ (Auto Path)      │   │ (Human-in-the-Loop)  │
-└─────────┬────────┘   └──────────┬───────────┘
-          │                         │
-          ▼                         ▼
-┌──────────────────┐   ┌──────────────────────┐
-│ Save to Database │   │ Human Review UI      │
-│ / Downstream     │   │ (Context + Reasons)  │
-└─────────┬────────┘   └──────────┬───────────┘
-          │                         │
-          ▼                         ▼
-   ┌──────────────┐      ┌──────────────────┐
-   │   Complete   │      │ Approve / Reject │
-   └──────────────┘      └───────┬──────────┘
-                                 │
-                      ┌──────────┴──────────┐
-                      │                     │
-                      ▼                     ▼
-             ┌──────────────────┐   ┌──────────────────┐
-             │ Save to Database │   │ Terminate / Stop │
-             └──────────────────┘   └──────────────────┘
-
-```
+![Workflow illustration](./OR-264-Langchain-Agentic-Orchestration_RS-Edit_banner.jpg)
 
 ## Why this matters for customers
 * **Complex logic, simple visibility:** Even with parallel agents, decision gates, and human-in-the-loop steps, the Conductor UI makes it easy to see exactly what happened and where something failed.
