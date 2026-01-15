@@ -1,0 +1,18 @@
+{
+  "name": "conductor-workflow-registry",
+  "version": "1.0.0",
+  "description": "```bash npm run register-workflows ```",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "register-workflows":  "node scripts/register-workflows.mjs",
+    "plan:register-workflows": "node scripts/register-workflows.mjs --plan"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@io-orkes/conductor-javascript": "^2.4.1",
+    "dotenv": "^17.2.3"
+  }
+}

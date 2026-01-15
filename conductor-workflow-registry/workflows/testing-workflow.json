@@ -1,0 +1,38 @@
+{
+  "name": "testing-workflow-from-code",
+  "description": "just here for a demo. has a simple task.",
+  "version": 1,
+  "tasks": [
+    {
+      "name": "testing-simple-task-registration-from-code",
+      "taskReferenceName": "simple_ref",
+      "inputParameters": {},
+      "type": "SIMPLE",
+      "decisionCases": {},
+      "defaultCase": [],
+      "forkTasks": [],
+      "startDelay": 0,
+      "joinOn": [],
+      "optional": false,
+      "defaultExclusiveJoinTask": [],
+      "asyncComplete": false,
+      "loopOver": [],
+      "onStateChange": {},
+      "permissive": false
+    }
+  ],
+  "inputParameters": [],
+  "outputParameters": {},
+  "failureWorkflow": "",
+  "schemaVersion": 2,
+  "restartable": true,
+  "workflowStatusListenerEnabled": false,
+  "ownerEmail": "maria.shimkovska@orkes.io",
+  "timeoutPolicy": "ALERT_ONLY",
+  "timeoutSeconds": 0,
+  "variables": {},
+  "inputTemplate": {},
+  "enforceSchema": true,
+  "metadata": {},
+  "maskedFields": []
+}
