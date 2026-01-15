@@ -21,12 +21,6 @@ If everything passes, the workflow proceeds automatically and saves the result. 
           └─────────┬────────────┘
                     │
                     ▼
-          ┌──────────────────────┐
-          │ Normalize / Prepare  │
-          │ Data for Evaluation  │
-          └─────────┬────────────┘
-                    │
-                    ▼
         ┌───────────────────────────────┐
         │   Parallel AI Evaluations     │
         │                               │
