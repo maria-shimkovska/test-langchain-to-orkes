@@ -82,29 +82,229 @@ If everything passes, the workflow proceeds automatically and saves the result. 
 
 **In short, Orkes Conductor lets teams build and operate sophisticated workflows with confidence, while giving them a clear, visual way to spot issues and adapt as workflows grow and change.**
 
-## Agent overview (LangChain agents)
+## Why This Agent Setup Exists
+This demo shows how we turn a messy customer message into something you can safely automate.
+
+First, an AI agent takes an unstructured message and turns it into more structured data. That makes the data easy to route and use, but we don’t assume it’s perfect. Models can guess, make things up, or choose the wrong category.
+
+So right after extraction, we run a few evaluation agents in parallel. One checks that the model didn’t invent details. Another makes sure the output matches the expected schema. A third does a quick sanity check to see if the routing and urgency actually make sense based on the message.
+
+If all the checks pass, the workflow continues automatically. If anything fails, it’s sent to a human with clear reasons why. Orkes Conductor ties this all together and makes every step visible, so you can trust what’s automated and quickly spot what needs attention.
+
+## Agent overview/breakdown (LangChain agents)
 ### 1. Extraction Agent
 
-This agent takes an unstructured message (for example, an email or support ticket) and extracts structured information from it. Its job is to turn free-form text into clean, machine-readable data that downstream systems can reliably use.
+file: `langchainAgent.js`
+
+This agent takes a messy, unstructured customer message (like an email or chat) and turns it into a clean, structured support ticket JSON. It uses an AI model to understand the text and fill in a fixed schema, so the output is always predictable and easy to use in workflows. If information isn’t explicitly mentioned, the agent leaves it as null or uses safe defaults instead of guessing.
+
+The agent extracts customer details, identifies the issue category and urgency, pulls out useful entities like dates, amounts, and reference IDs, and adds a short human-readable summary. The result is a single structured object that can be passed directly into routing, evaluation, or automation steps in an Orkes Conductor workflow.
+
+#### Example input (what the agent receives):
+```text
+“Hi, I’m Jane Doe. I was charged $49.99 on 12/01/2025 for invoice ABC123. This is urgent—please call me.”
+```
+
+#### Example output (what the agent returns):
+```json
+Extraction Result:
+{
+  "customer": {
+    "name": "Jane Doe",
+    "email": null,
+    "phone": null
+  },
+  "issue": {
+    "category": "billing",
+    "urgency": "high",
+    "summary": "Charge of $4109.90 for invoice ABC123 on 12/01/2025."
+  },
+  "entities": {
+    "dates": [
+      "12/01/2025"
+    ],
+    "amounts": [
+      "$4109.90"
+    ],
+    "reference_ids": [
+      "ABC123"
+    ]
+  },
+  "flags": {
+    "requires_callback": true,
+    "mentions_attachment": false
+  },
+  "meta": {
+    "extracted_at": "2026-01-14T22:42:28.981Z"
+  }
+}
+```
 
 ### 2. Grounding Evaluation Agent
 
-This agent checks whether the extracted data is actually grounded in the original message. It verifies that the AI didn’t hallucinate or invent information that wasn’t present in the input.
+This is an evaluation agent that checks grounding (aka “did we make stuff up?”). It takes the original customer message and the extracted ticket JSON, then verifies that key fields (email, phone, dates, amounts, reference IDs) actually appear in the original text. If the ticket includes values that aren’t supported by the message, it flags them as hallucinations and fails the eval. Names are treated as a warning instead of a hard fail, since names are harder to reliably match with simple substring rules.
 
+#### Example input
+```json
+{
+  "messageText": "Hi, I'm Jane Doe. I was charged $49.99 on 12/01/2025 for invoice ABC123.",
+  "ticketJson": {
+    "customer": { "name": "Jane Doe", "email": null, "phone": null },
+    "issue": { "category": "billing", "urgency": "high", "summary": "Charged for invoice." },
+    "entities": { "dates": ["12/01/2025"], "amounts": ["$49.99"], "reference_ids": ["ABC123"] },
+    "flags": { "requires_callback": false, "mentions_attachment": false },
+    "meta": { "extracted_at": "2026-01-14T22:10:31.150Z" }
+  }
+}
+```
+
+#### Output
+```json
+{
+  "evaluator": "grounding",
+  "passed": true,
+  "score": 1,
+  "errors": [],
+  "hallucinations": [],
+  "field_checks": [
+    { "field": "entities.amounts[]", "value": "$49.99", "supported": true, "evidence": "$49.99", "severity": "error" },
+    { "field": "entities.dates[]", "value": "12/01/2025", "supported": true, "evidence": "12/01/2025", "severity": "error" },
+    { "field": "entities.reference_ids[]", "value": "ABC123", "supported": true, "evidence": "ABC123", "severity": "error" },
+    { "field": "customer.name", "value": "Jane Doe", "supported": true, "evidence": "Jane Doe", "severity": "warning" }
+  ]
+}
+
+```
 ### 3. Schema Evaluation Agent
 
-This agent validates that the extracted data matches the expected structure and format. It ensures required fields are present, values are valid, and the output conforms to the schema needed by downstream systems.
+This is an evaluation agent that checks schema correctness (aka “does this output match what downstream systems expect?”). It validates that the extracted ticket JSON conforms to the required structure, data types, and allowed values. The agent ensures all required fields are present, enums contain valid values, and nested objects and arrays follow the expected shape.
+
+If the extracted ticket does not match the schema, the eval fails and reports exactly which fields are invalid or missing. If the ticket fully conforms to the schema, the eval passes with a perfect score.
+
+This agent focuses purely on structural and format validity — it does not check whether values are grounded in the original message or whether the categorization is semantically correct.
+
+#### Input  
+
+```json
+{
+  "ticketJson": {
+    "customer": { "name": "Jane Doe", "email": null, "phone": null },
+    "issue": { "category": "billing", "urgency": "high", "summary": "Charged for invoice." },
+    "entities": { "dates": ["12/01/2025"], "amounts": ["$49.99"], "reference_ids": ["ABC123"] },
+    "flags": { "requires_callback": false, "mentions_attachment": false },
+    "meta": { "extracted_at": "2026-01-14T22:10:31.150Z" }
+  }
+}
+```
+
+#### Output (valid schema)
+
+```json 
+{
+  "evaluator": "schema",
+  "passed": true,
+  "score": 1,
+  "errors": [],
+  "mismatches": []
+}
+```
+
+#### Output (invalid schema)
+
+```json
+{
+  "evaluator": "schema",
+  "passed": false,
+  "score": 0,
+  "errors": ["Schema mismatch"],
+  "mismatches": [
+    {
+      "path": "issue.urgency",
+      "expected": "one of: low | medium | high",
+      "got": "URGENT"
+    }
+  ]
+}
+```
 
 ### 4. Routing Evaluation Agent
-This agent checks whether the extracted data would be routed correctly. For example, it validates that the right category, priority, or destination was chosen based on the original message.
+This is an evaluation agent that checks routing sanity (aka “will this ticket get sent to the right team with the right priority?”). It takes the original customer message and the extracted ticket JSON, then uses a lightweight set of keyword-based expectations to validate that the category, urgency, and routing flags chosen by the extractor are reasonable.
+
+The agent looks for clear signals in the customer message—such as billing-related terms, technical error keywords, urgency phrases, or requests for callbacks—and compares those signals against what the extractor produced. When the message strongly implies a specific routing decision and the extracted ticket disagrees, the agent flags a mismatch.
+
+This agent is intentionally conservative: it only flags issues when there are strong, obvious signals in the text. It does not attempt deep semantic understanding, and it does not fail the eval when the message is ambiguous.
+
+#### What it checks 
+* Category sanity
+    * Billing keywords (e.g. invoice, refund, charge) → category should be "billing"
+    * Technical keywords (e.g. login, error, 2FA, crash) → category should be "technical"
+    * Account keywords (e.g. subscription, plan, settings) → category should be "account"
+* Urgency sanity
+    * High-urgency keywords (e.g. urgent, ASAP, today) → urgency should be "high"
+    * Low-urgency keywords (e.g. no rush, whenever) → urgency should be "low"
+* Routing flags
+    * Callback phrases (e.g. call me, phone me) → requires_callback = true
+    * Attachment mentions (e.g. attached, attachment) → mentions_attachment = true
+
+Each violated expectation is recorded as a mismatch. The score decreases slightly for each mismatch, and the eval fails if any mismatches are present.
+
+#### Input 
+
+```json 
+{
+  "messageText": "Hi, I can’t log in. I keep getting a 2FA error and it’s urgent. Please call me back today.",
+  "ticketJson": {
+    "customer": { "name": null, "email": null, "phone": null },
+    "issue": { "category": "general", "urgency": "medium", "summary": "User needs help." },
+    "entities": { "dates": [], "amounts": [], "reference_ids": [] },
+    "flags": { "requires_callback": false, "mentions_attachment": false },
+    "meta": { "extracted_at": "2026-01-14T22:10:31.150Z" }
+  }
+}
+```
+
+#### Output 
+
+```json 
+{
+  "evaluator": "routing",
+  "passed": false,
+  "score": 0.55,
+  "errors": [],
+  "mismatches": [
+    {
+      "rule": "technical_keywords_imply_technical",
+      "expected": "technical",
+      "got": "general"
+    },
+    {
+      "rule": "urgent_keywords_imply_high",
+      "expected": "high",
+      "got": "medium"
+    },
+    {
+      "rule": "callback_keywords_imply_requires_callback",
+      "expected": true,
+      "got": false
+    }
+  ]
+}
+```
+
+### 5. Quality Evaluation Agent
+
+This evaluation agent checks whether the extracted ticket is useful and reasonable. It looks at the original customer message and the extracted ticket JSON, then judges whether the summary is specific, the category and urgency make sense, and obvious details from the message weren’t missed. This isn’t a strict “truth check” like grounding. It’s more of a “would a support team actually want this ticket?” check.
+
+The quality eval protects the overall agent from producing “technically correct but useless” output, and it gives Conductor a smart reason to stop automation before bad data flows downstream. Like is this actually useful to act on? 
 
 ## How this works together
 All evaluation agents run in parallel, which keeps the workflow fast while still enforcing quality. Their results are aggregated into a single decision that determines whether the workflow can proceed automatically or needs human review.
+
 This pattern shows how Orkes Conductor makes it easy to:
-Orchestrate multiple LangChain agents
-Add quality gates without slowing down the system
-Clearly see which agent passed or failed in the UI
-Extend the workflow as new agents or checks are needed
+1. Orchestrate multiple LangChain agents
+2. Add quality gates without slowing down the system
+3. Clearly see which agent passed or failed in the UI
+4. Extend the workflow as new agents or checks are needed
 
 ## Test With 
 
@@ -120,6 +320,24 @@ Hi, my name is Sarah Jade. You can reach me at sarah.j@example.com or 555-123-45
 Hello,I think there might be an issue with my account or billing.I was charged recently and I’m not sure why.My name is Sarah Jade.You can email me at sarah.j@example.com.Please help when you get a chance.
 ```
 
+## Steps 
+
+### Set up OPENAI_API_KEY
+
+```bash
+export OPENAI_API_KEY=your-key
+```
+### Add access keys 
+Add your keys in the .env files :P
+
+```bash
+
+```
+
+### Install dependencies
+```bash
+npm install
+```
 
 
 

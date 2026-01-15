@@ -4,71 +4,45 @@ import {
   TaskManager,
 } from '@io-orkes/conductor-javascript';
 
-// Import main langchang agent
-import { createSimpleExtractionAgent } from './langchainAgent.ts';
+// Import main langchain agent
+import { createSimpleExtractionAgent } from './langchainAgent.js';
 
 // import the eval langchain agents
-import { createGroundingEvalAgent } from './groundingEvalAgent.ts'; 
-import { createSchemaEvalAgent } from './schemaEvalAgent.ts';
-import { createRoutingEvalAgent } from './routingEvalAgent.ts';
+import { createGroundingEvalAgent } from './groundingEvalAgent.js'; 
+import { createSchemaEvalAgent } from './schemaEvalAgent.js';
+import { createRoutingEvalAgent } from './routingEvalAgent.js';
+import { createQualityEvalAgent } from "./qualityEvalAgent.js";
 
 import 'dotenv/config';
 
-// initialize all 4 agents so we can use them in this file :) 
+// Initialize all agents once (reuse across tasks)
 const agent = createSimpleExtractionAgent();
 const groundingEvalAgent = createGroundingEvalAgent();
 const schemaEvalAgent = createSchemaEvalAgent();
 const routingEvalAgent = createRoutingEvalAgent();
+const qualityEvalAgent = createQualityEvalAgent();
 
-const agentWorker = {
-  taskDefName: 'extract_agent',
+// Wrapper 1
+export const extractAgentWorker = {
+  taskDefName: "extract_agent",
   execute: async (task) => {
-    try {
-      // Get query from Conductor input
-      const query = task.inputData?.query;
-
-      if (!query) {
-        return {
-          outputData: {
-            error: 'No query provided',
-            response: null,
-          },
-          status: 'FAILED_WITH_TERMINAL_ERROR',
-          reasonForIncompletion: 'Missing required input: query',
-        };
-      }
-
-      // Run agent with the query from Conductor
-      const result = await agent.invoke({
-        messages: [
-          {
-            role: 'user',
-            content: query,
-          },
-        ],
-      });
-
-      const response = result.messages[result.messages.length - 1].content;
-
-      const toolsUsed = result.messages
-        .filter((msg) => msg.tool_calls && msg.tool_calls.length > 0)
-        .flatMap((msg) => msg.tool_calls.map((tc) => tc.name));
-
+    const query = task.inputData?.query;
+    if (!query) {
       return {
-        outputData: {
-          response: response,
-          toolsUsed: toolsUsed,
-          messageCount: result.messages.length,
-        },
-        status: 'COMPLETED',
-      };
-    } catch (error) {
-      return {
-        outputData: { error: error.message, response: null },
-        status: 'FAILED',
-        reasonForIncompletion: `Agent execution failed: ${error.message}`,
+        status: "FAILED_WITH_TERMINAL_ERROR",
+        reasonForIncompletion: "Missing query",
+        outputData: { response: null, error: "Missing query" },
       };
     }
+
+    const result = await agent.invoke({
+      messages: [{ role: "user", content: query }],
+    });
+
+    return {
+      status: "COMPLETED",
+      outputData: { response: result.structuredResponse ?? result },
+    };
   },
 };
 
@@ -137,7 +111,6 @@ const groundingEvalAgentWorker = {
   },
 };
 
-
 // Wrapper 2
 const schemaEvalAgentWorker = {
   taskDefName: 'schema_eval_agent',
@@ -193,7 +166,6 @@ const result = await schemaEvalAgent.invoke({
     }
   },
 };
-
 
 // Wrapper 3
 const routingEvalAgentWorker = {
@@ -259,17 +231,51 @@ const routingEvalAgentWorker = {
   },
 };
 
+// Wrapper 4
+export const qualityEvalAgentWorker = {
+  taskDefName: "quality_eval_agent",
+  execute: async (task) => {
+    try {
+      const input = task.inputData ?? {};
+      const messageText = input.messageText ?? input.query ?? "";
+      const ticketJson = input.ticketJson;
+
+      if (!messageText || !ticketJson) {
+        return {
+          status: "FAILED_WITH_TERMINAL_ERROR",
+          reasonForIncompletion: "Missing messageText or ticketJson",
+          outputData: { response: null, error: "Missing messageText or ticketJson" },
+        };
+      }
+
+      const result = await qualityEvalAgent.invoke({
+        messages: [{ role: "user", content: JSON.stringify({ messageText, ticketJson }) }],
+      });
+
+      return {
+        status: "COMPLETED",
+        outputData: { response: result.structuredResponse ?? result },
+      };
+    } catch (error) {
+      return {
+        status: "FAILED",
+        reasonForIncompletion: `Quality eval failed: ${error?.message ?? String(error)}`,
+        outputData: { response: null, error: error?.message ?? String(error) },
+      };
+    }
+  },
+};
 
 async function startWorker() {
   const client = await orkesConductorClient({
     serverUrl: 'https://developer.orkescloud.com/api',
-    keyId: 'replace-me',
-    keySecret: 'replace-me',
+    keyId: 'change-me',
+    keySecret: 'change-me',
   });
 
   console.log('Connected to Conductor ✅');
 
-  const taskManager = new TaskManager(client, [agentWorker, groundingEvalAgentWorker, schemaEvalAgentWorker, routingEvalAgentWorker], {
+  const taskManager = new TaskManager(client, [extractAgentWorker, groundingEvalAgentWorker, schemaEvalAgentWorker, routingEvalAgentWorker, qualityEvalAgentWorker], {
     options: { concurrency: 10, pollInterval: 200 },
   });
 
