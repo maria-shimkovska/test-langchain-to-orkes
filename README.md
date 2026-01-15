@@ -31,7 +31,7 @@ If everything passes, the workflow proceeds automatically and saves the result. 
         │   Parallel AI Evaluations     │
         │                               │
         │  ┌──────────┐  ┌──────────┐   │
-        │  │ Grounding│  │  Schema  │   │
+        │  │ Grounding│  │  Quality │   │
         │  │   Eval   │  │   Eval   │   │
         │  └──────────┘  └──────────┘   │
         │          ┌──────────┐         │
